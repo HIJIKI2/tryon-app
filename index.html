@@ -476,9 +476,12 @@
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model_image: images.person,
-          garment_image: images.garment,
-          category: 'auto'
+          model_name: 'tryon-v1.6',
+          inputs: {
+            model_image: images.person,
+            garment_image: images.garment,
+            category: 'auto'
+          }
         })
       });
 
