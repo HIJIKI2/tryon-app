@@ -202,6 +202,27 @@
     }
     .upload-zone.has-image .remove-btn { display: flex; }
 
+    /* ── Quality selector ── */
+    .quality-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .quality-opt input { display: none; }
+    .quality-card {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .quality-card strong { font-size: 13px; font-weight: 500; }
+    .quality-card small { font-size: 11px; color: var(--text-sub); }
+    .quality-opt input:checked + .quality-card {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
     /* ── Generate button ── */
     .generate-btn {
       width: 100%;
@@ -338,11 +359,32 @@
     </div>
   </div>
 
+  <!-- Quality selector -->
+  <div>
+    <div class="section-label">品質設定</div>
+    <div class="quality-row">
+      <label class="quality-opt">
+        <input type="radio" name="quality" value="standard" checked />
+        <span class="quality-card">
+          <strong>標準（高品質）</strong>
+          <small>1クレジット / 約20秒</small>
+        </span>
+      </label>
+      <label class="quality-opt">
+        <input type="radio" name="quality" value="max" />
+        <span class="quality-card">
+          <strong>最高品質 MAX</strong>
+          <small>3クレジット / 高解像度</small>
+        </span>
+      </label>
+    </div>
+  </div>
+
   <!-- Generate -->
   <button class="generate-btn" id="generateBtn" onclick="generate()" disabled>
     試着を生成する
   </button>
-  <div class="credits-note">1回 = 1クレジット（約11円）</div>
+  <div class="credits-note" id="creditsNote">標準: 1回 = 1クレジット（約11円）</div>
 
   <!-- Status -->
   <div class="status-box" id="statusBox">
@@ -391,6 +433,15 @@
 
   document.getElementById('personInput').addEventListener('change', e => handleFile(e, 'person'));
   document.getElementById('garmentInput').addEventListener('change', e => handleFile(e, 'garment'));
+
+  document.querySelectorAll('input[name="quality"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const note = document.getElementById('creditsNote');
+      note.textContent = r.value === 'max'
+        ? '最高品質MAX: 1回 = 3クレジット（約34円）'
+        : '標準: 1回 = 1クレジット（約11円）';
+    });
+  });
 
   function updateApiNotice() {
     document.getElementById('apiNotice').style.display = apiKey ? 'none' : 'block';
@@ -468,6 +519,34 @@
     document.getElementById('resultSection').classList.remove('show');
 
     try {
+      // Get selected quality
+      const quality = document.querySelector('input[name="quality"]:checked').value;
+
+      let payload;
+      if (quality === 'max') {
+        // Try-On Max: highest fidelity
+        payload = {
+          model_name: 'tryon-max',
+          inputs: {
+            model_image: images.person,
+            garment_image: images.garment,
+            generation_mode: 'quality'
+          }
+        };
+      } else {
+        // Standard v1.6 with quality mode
+        payload = {
+          model_name: 'tryon-v1.6',
+          inputs: {
+            model_image: images.person,
+            garment_image: images.garment,
+            category: 'auto',
+            mode: 'quality',
+            garment_photo_type: 'auto'
+          }
+        };
+      }
+
       // Step 1: Submit job
       const submitRes = await fetch('https://api.fashn.ai/v1/run', {
         method: 'POST',
@@ -475,14 +554,7 @@
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify({
-          model_name: 'tryon-v1.6',
-          inputs: {
-            model_image: images.person,
-            garment_image: images.garment,
-            category: 'auto'
-          }
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!submitRes.ok) {
