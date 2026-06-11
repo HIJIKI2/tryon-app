@@ -524,12 +524,12 @@
 
       let payload;
       if (quality === 'max') {
-        // Try-On Max: highest fidelity
+        // Try-On Max: highest fidelity (uses product_image instead of garment_image)
         payload = {
           model_name: 'tryon-max',
           inputs: {
             model_image: images.person,
-            garment_image: images.garment,
+            product_image: images.garment,
             generation_mode: 'quality'
           }
         };
