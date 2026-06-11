@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI試着アプリ</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Sans:wght@300;400;500&display=swap');
+
+    :root {
+      --bg: #0f0f10;
+      --surface: #1a1a1d;
+      --surface2: #242428;
+      --border: #2e2e33;
+      --accent: #c8a97e;
+      --accent-dim: rgba(200,169,126,0.15);
+      --text: #f0ece4;
+      --text-sub: #888;
+      --radius: 14px;
+      --error: #e05c5c;
+      --success: #5cbb8a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', 'Noto Sans JP', sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 20px 20px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+    }
+
+    .logo span { color: var(--text); font-weight: 300; }
+
+    .settings-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-sub);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .settings-btn:hover { color: var(--text); border-color: var(--accent); }
+
+    main {
+      flex: 1;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      max-width: 520px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ── API Key Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 28px 20px 36px;
+      width: 100%;
+      max-width: 520px;
+    }
+
+    .modal h2 { font-size: 17px; margin-bottom: 8px; }
+    .modal p  { font-size: 13px; color: var(--text-sub); margin-bottom: 18px; line-height: 1.6; }
+
+    .modal a { color: var(--accent); text-decoration: none; }
+
+    input[type="password"], input[type="text"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: var(--accent); }
+
+    .btn-row { display: flex; gap: 10px; margin-top: 14px; }
+
+    .btn {
+      flex: 1;
+      border: none;
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #1a1200; }
+    .btn-secondary { background: var(--surface2); color: var(--text); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Upload zones ── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-sub);
+      margin-bottom: 10px;
+    }
+
+    .upload-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .upload-zone {
+      aspect-ratio: 3/4;
+      background: var(--surface);
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .upload-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .upload-icon { font-size: 28px; margin-bottom: 8px; }
+    .upload-label { font-size: 12px; color: var(--text-sub); text-align: center; padding: 0 8px; line-height: 1.4; }
+
+    .upload-zone img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: calc(var(--radius) - 1px);
+    }
+
+    .upload-zone .remove-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0,0,0,0.6);
+      border: none;
+      color: white;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      font-size: 14px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+    .upload-zone.has-image .remove-btn { display: flex; }
+
+    /* ── Generate button ── */
+    .generate-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #1a1200;
+      border: none;
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      position: relative;
+      overflow: hidden;
+    }
+    .generate-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .generate-btn:not(:disabled):active { transform: scale(0.98); }
+
+    /* ── Status / Result ── */
+    .status-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 13px;
+      color: var(--text-sub);
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-box.show { display: flex; }
+    .status-box.error { border-color: var(--error); color: var(--error); }
+    .status-box.success { border-color: var(--success); color: var(--success); }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .result-section { display: none; }
+    .result-section.show { display: block; }
+
+    .result-img-wrap {
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+      position: relative;
+    }
+    .result-img-wrap img { width: 100%; display: block; }
+
+    .save-btn {
+      width: 100%;
+      margin-top: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .save-btn:hover { border-color: var(--accent); }
+
+    /* ── API key notice ── */
+    .api-notice {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+    }
+    .api-notice strong { color: var(--accent); }
+
+    /* ── Credits info ── */
+    .credits-note {
+      font-size: 11px;
+      color: var(--text-sub);
+      text-align: center;
+    }
+
+    footer {
+      padding: 16px 20px 32px;
+      text-align: center;
+      font-size: 11px;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">TRYON<span>.ai</span></div>
+  <button class="settings-btn" onclick="openModal()">⚙ APIキー設定</button>
+</header>
+
+<main>
+
+  <!-- API Key notice -->
+  <div class="api-notice" id="apiNotice">
+    <strong>APIキーが未設定です。</strong><br>
+    右上の「APIキー設定」から <a href="https://app.fashn.ai" target="_blank">fashn.ai</a> のAPIキーを入力してください。
+  </div>
+
+  <!-- Upload -->
+  <div>
+    <div class="section-label">画像をアップロード</div>
+    <div class="upload-grid">
+
+      <div class="upload-zone" id="personZone">
+        <input type="file" accept="image/*" id="personInput" />
+        <div class="upload-icon">🧍</div>
+        <div class="upload-label">自分の写真<br>（全身が映るもの）</div>
+        <button class="remove-btn" onclick="removeImage('person', event)">✕</button>
+      </div>
+
+      <div class="upload-zone" id="garmentZone">
+        <input type="file" accept="image/*" id="garmentInput" />
+        <div class="upload-icon">👙</div>
+        <div class="upload-label">着せたい服<br>（水着・服など）</div>
+        <button class="remove-btn" onclick="removeImage('garment', event)">✕</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Generate -->
+  <button class="generate-btn" id="generateBtn" onclick="generate()" disabled>
+    試着を生成する
+  </button>
+  <div class="credits-note">1回 = 1クレジット（約11円）</div>
+
+  <!-- Status -->
+  <div class="status-box" id="statusBox">
+    <div class="spinner" id="spinner"></div>
+    <span id="statusText">生成中... 約10〜20秒かかります</span>
+  </div>
+
+  <!-- Result -->
+  <div class="result-section" id="resultSection">
+    <div class="section-label">生成結果</div>
+    <div class="result-img-wrap">
+      <img id="resultImg" src="" alt="試着結果" />
+    </div>
+    <button class="save-btn" onclick="saveImage()">📥 画像を保存する</button>
+  </div>
+
+</main>
+
+<!-- API Key Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <h2>APIキー設定</h2>
+    <p>
+      <a href="https://app.fashn.ai" target="_blank">app.fashn.ai</a> にログインし、
+      サイドバー → API → API Keys からキーを取得してください。<br>
+      キーはこのデバイスにのみ保存されます。
+    </p>
+    <input type="password" id="apiKeyInput" placeholder="fashn_xxxxxxxxxxxxxxxx" />
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveApiKey()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<footer>画像はFashn.ai APIに送信されます。72時間後に自動削除されます。</footer>
+
+<script>
+  // ── State ──
+  let apiKey = localStorage.getItem('fashn_api_key') || '';
+  let images = { person: null, garment: null };
+  let resultUrl = null;
+
+  // ── Init ──
+  updateApiNotice();
+
+  document.getElementById('personInput').addEventListener('change', e => handleFile(e, 'person'));
+  document.getElementById('garmentInput').addEventListener('change', e => handleFile(e, 'garment'));
+
+  function updateApiNotice() {
+    document.getElementById('apiNotice').style.display = apiKey ? 'none' : 'block';
+    updateGenerateBtn();
+  }
+
+  function updateGenerateBtn() {
+    const ready = apiKey && images.person && images.garment;
+    document.getElementById('generateBtn').disabled = !ready;
+  }
+
+  // ── File handling ──
+  function handleFile(e, type) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      images[type] = ev.target.result; // base64 data URL
+      const zone = document.getElementById(type + 'Zone');
+      // Remove old img if any
+      const old = zone.querySelector('img');
+      if (old) old.remove();
+      // Add preview
+      const img = document.createElement('img');
+      img.src = ev.target.result;
+      zone.appendChild(img);
+      zone.classList.add('has-image');
+      // Hide placeholder
+      zone.querySelector('.upload-icon').style.display = 'none';
+      zone.querySelector('.upload-label').style.display = 'none';
+      updateGenerateBtn();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeImage(type, e) {
+    e.stopPropagation();
+    images[type] = null;
+    const zone = document.getElementById(type + 'Zone');
+    const img = zone.querySelector('img');
+    if (img) img.remove();
+    zone.classList.remove('has-image');
+    zone.querySelector('.upload-icon').style.display = '';
+    zone.querySelector('.upload-label').style.display = '';
+    document.getElementById(type + 'Input').value = '';
+    updateGenerateBtn();
+  }
+
+  // ── API Key Modal ──
+  function openModal() {
+    document.getElementById('apiKeyInput').value = apiKey;
+    document.getElementById('modalOverlay').classList.add('open');
+  }
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
+  function handleOverlayClick(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeModal();
+  }
+  function saveApiKey() {
+    const val = document.getElementById('apiKeyInput').value.trim();
+    if (!val) { alert('APIキーを入力してください'); return; }
+    apiKey = val;
+    localStorage.setItem('fashn_api_key', val);
+    closeModal();
+    updateApiNotice();
+  }
+
+  // ── Generate ──
+  async function generate() {
+    if (!apiKey || !images.person || !images.garment) return;
+
+    setStatus('loading', '生成中... 約10〜20秒かかります');
+    document.getElementById('generateBtn').disabled = true;
+    document.getElementById('resultSection').classList.remove('show');
+
+    try {
+      // Step 1: Submit job
+      const submitRes = await fetch('https://api.fashn.ai/v1/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model_image: images.person,
+          garment_image: images.garment,
+          category: 'auto'
+        })
+      });
+
+      if (!submitRes.ok) {
+        const err = await submitRes.json().catch(() => ({}));
+        throw new Error(err.detail || err.message || `APIエラー (${submitRes.status})`);
+      }
+
+      const { id } = await submitRes.json();
+      if (!id) throw new Error('ジョブIDが取得できませんでした');
+
+      // Step 2: Poll for result
+      setStatus('loading', '処理中... しばらくお待ちください');
+      const outputUrl = await pollResult(id);
+
+      // Show result
+      resultUrl = outputUrl;
+      document.getElementById('resultImg').src = outputUrl;
+      document.getElementById('resultSection').classList.add('show');
+      setStatus('success', '✓ 生成完了！');
+      setTimeout(() => hideStatus(), 3000);
+
+    } catch (err) {
+      setStatus('error', `エラー: ${err.message}`);
+    } finally {
+      document.getElementById('generateBtn').disabled = false;
+    }
+  }
+
+  async function pollResult(id, maxAttempts = 30, interval = 2000) {
+    for (let i = 0; i < maxAttempts; i++) {
+      await sleep(interval);
+      const res = await fetch(`https://api.fashn.ai/v1/status/${id}`, {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      if (!res.ok) throw new Error(`ステータス確認エラー (${res.status})`);
+      const data = await res.json();
+
+      if (data.status === 'completed') {
+        const url = data.output?.[0];
+        if (!url) throw new Error('出力URLが取得できませんでした');
+        return url;
+      }
+      if (data.status === 'failed') {
+        throw new Error(data.error || '生成に失敗しました');
+      }
+      // still processing
+      const elapsed = Math.round((i + 1) * interval / 1000);
+      setStatus('loading', `処理中... ${elapsed}秒経過`);
+    }
+    throw new Error('タイムアウト: 処理が完了しませんでした');
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ── Status helpers ──
+  function setStatus(type, text) {
+    const box = document.getElementById('statusBox');
+    const spinner = document.getElementById('spinner');
+    box.className = 'status-box show';
+    if (type === 'error') box.classList.add('error');
+    if (type === 'success') box.classList.add('success');
+    spinner.style.display = type === 'loading' ? 'block' : 'none';
+    document.getElementById('statusText').textContent = text;
+  }
+  function hideStatus() {
+    document.getElementById('statusBox').classList.remove('show');
+  }
+
+  // ── Save image ──
+  async function saveImage() {
+    if (!resultUrl) return;
+    try {
+      const res = await fetch(resultUrl);
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `tryon_${Date.now()}.jpg`;
+      a.click();
+    } catch {
+      // Fallback: open in new tab
+      window.open(resultUrl, '_blank');
+    }
+  }
+</script>
+</body>
+</html>
